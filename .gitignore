@@ -1,0 +1,14 @@
+# Git
+.git/
+
+# Local environmental variables
+.env
+
+# VS Code
+.vscode/
+
+# Python cached files
+src/__pycache__/*
+
+# Local project notes
+notes.md
