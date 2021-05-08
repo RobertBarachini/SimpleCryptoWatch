@@ -14,7 +14,7 @@ def test_coinmarketcap_api():
 	}
 	headers = {
 		'Accepts': 'application/json',
-		'X-CMC_PRO_API_KEY': SupportFunctions.get_env_var(ENV.COINMARKETCAP_API_KEY_STRING, require_input=True, input_str="Please enter your CoinMarketCap API key: "),
+		'X-CMC_PRO_API_KEY': SupportFunctions.get_env_var(ENV.COINMARKETCAP_API_KEY, require_input=True, input_str="Please enter your CoinMarketCap API key: "),
 	}
 
 	session = Session()

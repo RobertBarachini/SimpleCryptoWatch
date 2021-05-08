@@ -1,5 +1,18 @@
 import os
+import config
 # from dotenv import load_dotenv
+
+def set_logging(logging, filename):
+	if not os.path.isdir("logs"):
+		os.makedirs("logs")
+	level = None
+	if config.environment == "debug":
+		level = logging.INFO
+	else: 
+		level = logging.DEBUG
+	# encoding can be used with Python 3.9, not 3.7 ; encoding='utf-8'
+	logging.basicConfig(filename=f'logs/{filename}.log', level=level, filemode="a+", format='%(asctime)s.%(msecs)03d %(levelname)-8s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+	logging.info(f"Set up logging for '{filename}' with level '{level}'")
 
 def get_env_var(varname, require_input=False, input_str=None):
 	try:

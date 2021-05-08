@@ -10,5 +10,9 @@
 # Python cached files
 src/__pycache__/*
 
+# Local logs
+logs/
+src/logs/
+
 # Local project notes
 notes.md
