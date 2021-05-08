@@ -1,4 +1,5 @@
 # This file holds the string names of the environmental variables that will store API KEYS and db connection strings
+# AA="b" # To test init setup
 COINMARKETCAP_API_KEY="COINMARKETCAP_API_KEY"
 ALPHAVANTAGE_API_KEY="ALPHAVANTAGE_API_KEY"
 DB_USER="DB_USER"

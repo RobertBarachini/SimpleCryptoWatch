@@ -37,3 +37,16 @@ def input_env_var(varname, input_str=None):
 	val = input(input_str)
 	set_env_var(varname, val)
 	return val
+
+# Inits the .env file with all variable keys with empty values - user should add API keys and such after
+def private_env_setup():
+	if not os.path.exists(".env"):
+		import ENV
+		for var in ENV.__dict__:
+			if "__" not in var:
+				neki = ENV.__dict__[var]
+				set_env_var(neki, "")
+
+if __name__ == "__main__":
+	# private_env_setup()
+	None

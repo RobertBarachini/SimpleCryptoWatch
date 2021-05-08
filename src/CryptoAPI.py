@@ -3,30 +3,45 @@ from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
 import json
 import os
 import ENV
-import SupportFunctions
-	
+import SupportFunctions as sf
+import logging as log
 
-def test_coinmarketcap_api():
-	url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
-	parameters = {
-		'start':'1',
-		'limit':'10'
-	}
+sf.set_logging(log, "CryptoAPI")
+
+def get_data_coinmarketcap(url, parameters=None):
 	headers = {
 		'Accepts': 'application/json',
-		'X-CMC_PRO_API_KEY': SupportFunctions.get_env_var(ENV.COINMARKETCAP_API_KEY, require_input=True, input_str="Please enter your CoinMarketCap API key: "),
+		'X-CMC_PRO_API_KEY': sf.get_env_var(ENV.COINMARKETCAP_API_KEY, require_input=True, input_str="Please enter your CoinMarketCap API key: "),
 	}
-
 	session = Session()
 	session.headers.update(headers)
-
+	data = None
 	try:
+		log.info("Getting data from Coinmarketcap.")
 		response = session.get(url, params=parameters)
+		log.info("Got data from Coinmarketcap.")
 		data = json.loads(response.text)
-		print(data)
 	except (ConnectionError, Timeout, TooManyRedirects) as e:
-		print(e)
+		log.error(e)
+		log.error(f"url='{url}', parameters='{parameters}'")
+	return data
 
+def get_credit_info_coinmarketcap():
+	log.info("Checking Coinmarketcap credits.")
+	url = "https://pro-api.coinmarketcap.com/v1/key/info"
+	data = get_data_coinmarketcap(url)
+	return data
+
+def get_live_listings_coinmarketcap(parameters={'limit':'100','convert':'EUR'}):
+	log.info("Checking Coinmarketcap live listings.")
+	url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
+	data = get_data_coinmarketcap(url, parameters)
+	return data
+	
+# TODO
+# Create a folder named 'temp' and store all last request results there in json
 if __name__ == "__main__":
-	test_coinmarketcap_api()
+	data = None
+	# data = get_live_listings_coinmarketcap()
+	data = get_credit_info_coinmarketcap()
 	print("ok")
