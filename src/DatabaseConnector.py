@@ -1,16 +1,46 @@
 # Handles DB connections and CRUD operations
 
+# TODO Close DB connection on exit
+
 import ENV
 import SupportFunctions as sf
 import psycopg2
+from psycopg2.extras import Json, DictCursor
 import json
 import logging as log
 import config
+import time
+import datetime
 
 sf.set_logging(log, "DatabaseConnector")
 
 conn = None
 cur = None
+
+def init_conn(database, user, password, host, port, can_create=True):
+	global conn
+	global cur
+	try:
+		conn = psycopg2.connect(database=database, user=user, password=password, host=host, port=port)
+		cur = conn.cursor()
+		# cur.execute(f"SET TIME ZONE {time.tzname[time.localtime().tm_isdst]};")
+		# cur.execute(f"SET TIME ZONE '{datetime.datetime.now(datetime.timezone.utc).astimezone().tzname()}';")
+		# print( conn.cursor().connection.get_parameter_status("TimeZone") )
+		# cur.execute(f"SET TIME ZONE '{conn.cursor().connection.get_parameter_status('TimeZone')}';")
+		# print( conn.cursor().connection.get_parameter_status("TimeZone") )
+	except Exception as e:
+		log.error(e)
+		# If connection was established but the database does not exist we can try to create it and retry
+		# otherwise throw exception
+		if can_create and "does not exist" in str(e):
+			create_db(database, user, password, host, port)
+			# Retry connection
+			init_conn(database, user, password, host, port, can_create=False)
+		else:
+			log.error(e)
+			raise e
+	return conn, cur
+	
 
 def create_db(database, user, password, host, port):
 	global conn
@@ -29,24 +59,7 @@ def create_db(database, user, password, host, port):
 		log.error(f"Unable to create the DB with arguments: database='{user:s}', password='XXX', host='{host:s}', port='{port:s}'")
 		raise e
 
-def init_conn(database, user, password, host, port, can_create=True):
-	global conn
-	global cur
-	try:
-		conn = psycopg2.connect(database=database, user=user, password=password, host=host, port=port)
-		cur = conn.cursor()
-	except Exception as e:
-		log.error(e)
-		# If connection was established but the database does not exist we can try to create it and retry
-		# otherwise throw exception
-		if can_create and "does not exist" in str(e):
-			create_db(database, user, password, host, port)
-			# Retry connection
-			init_conn(database, user, password, host, port, can_create=False)
-		else:
-			log.error(e)
-			raise e
-
+# Init DB connection
 log.info("Initiating DB connection.")
 init_conn(database=sf.get_env_var(ENV.DB_NAME), 
 					user=sf.get_env_var(ENV.DB_USER), 
@@ -54,10 +67,6 @@ init_conn(database=sf.get_env_var(ENV.DB_NAME),
 					host=sf.get_env_var(ENV.DB_HOST),
 					port=sf.get_env_var(ENV.DB_PORT))
 log.info("Initiated DB connection.")
-
-# def read_json(table_name, query=None):
-# 	if query == None:
-# 		query = "SELECT * FROM
 
 def create_table(name, data):
 	tx = f"CREATE TABLE IF NOT EXISTS {name} ({data});"
@@ -87,22 +96,29 @@ def rollback():
 		log.error(e)
 		raise e
 
-def insert_into(name, data, auto_commit=True):
-	tx = f"INSERT INTO {name} {data};"
+def insert_into(name, tx, data=None, auto_commit=True):
+	# cur.execute('INSERT into live_listings (datetime_added, data) values (%s, %s)', [dt.datetime.now(), Json(data)])
+	tx = f"INSERT INTO {name} {tx};"
 	try:
-		log.info(f"Inserting into table '{name}' data={data}")
-		cur.execute(tx)
+		log.info(f"Inserting into table '{name}' tx={tx}.")
+		cur.execute(tx, data)
 		if auto_commit:
 			conn.commit()
 	except Exception as e:
 		log.error(e)
-		log.error(f"Tx: {tx}")
+		log.error(f"Tx: {tx} ; Data: {data}")
 		# You did an oopsie - try to rollback
 		# if "commands ignored until end of transaction block" in str(e):
 		rollback()
 
-def select_from(name, nrows=-1):
-	tx = f"SELECT * FROM {name};"
+def select_first(name):
+	return select_from(name, nrows=1)
+
+def select_last(name):
+	return select_from(name, nrows=1, reversed=True)
+
+def select_from(name, nrows=-1, reversed=False):
+	tx = f"SELECT * FROM {name}{'' if not reversed else ' ORDER BY id DESC'};"
 	try:
 		log.info(f"Selecting from table '{name}'")
 		cur.execute(tx)
@@ -119,43 +135,6 @@ def select_from(name, nrows=-1):
 		log.error(e)
 		log.error(f"Tx: {tx}")
 		rollback()
-
-
-def basic_db_test():
-	conn = psycopg2.connect(database=sf.get_env_var(ENV.DB_NAME), 
-													user=sf.get_env_var(ENV.DB_USER), 
-													password=sf.get_env_var(ENV.DB_PASS), 
-													host=sf.get_env_var(ENV.DB_HOST),
-													port=sf.get_env_var(ENV.DB_PORT))
-
-	# conn = psycopg2.connect(user=sf.get_env_var(ENV.DB_USER), 
-	# 												password=sf.get_env_var(ENV.DB_PASS), 
-	# 												host=sf.get_env_var(ENV.DB_HOST),
-	# 												port=sf.get_env_var(ENV.DB_PORT))
-	cur = conn.cursor()
-
-	# conn.autocommit = True
-	# db_string = "CREATE DATABASE " + sf.get_env_var(ENV.DB_NAME)
-	# cur.execute(db_string)
-
-	test_table = "test1"
-	# Execute a command: this creates a new table
-	cur.execute("CREATE TABLE " + test_table +  "(id serial PRIMARY KEY, num integer, data varchar);")
-	conn.commit()
-	# Pass data to fill a query placeholders and let Psycopg perform
-	# the correct conversion (no more SQL injections!)
-	cur.execute("INSERT INTO " + test_table + "(num, data) VALUES (%s, %s)", (100, "abc'def"))
-	conn.commit()
-	# Query the database and obtain data as Python objects
-	cur.execute("SELECT * FROM " + test_table + ";")
-	print(cur.fetchone())
-
-	# Make the changes to the database persistent
-	conn.commit()
-
-	# Close communication with the database
-	cur.close()
-	conn.close()
 
 if __name__ == "__main__":
 	log.info(f"Started '__main__' of '{__file__:s}'")

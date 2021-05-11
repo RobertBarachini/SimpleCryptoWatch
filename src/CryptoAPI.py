@@ -5,6 +5,7 @@ import os
 import ENV
 import SupportFunctions as sf
 import logging as log
+import config
 
 sf.set_logging(log, "CryptoAPI")
 
@@ -32,7 +33,7 @@ def get_credit_info_coinmarketcap():
 	data = get_data_coinmarketcap(url)
 	return data
 
-def get_live_listings_coinmarketcap(parameters={'limit':'100','convert':'EUR'}):
+def get_live_listings_coinmarketcap(parameters={'limit':f'{config.coinmarketcap_limit}','convert':'EUR'}):
 	log.info("Checking Coinmarketcap live listings.")
 	url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
 	data = get_data_coinmarketcap(url, parameters)

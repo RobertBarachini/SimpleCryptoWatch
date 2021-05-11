@@ -2,6 +2,7 @@ import os
 import config
 # from dotenv import load_dotenv
 
+# TODO fix logging in separate files as done in https://stackoverflow.com/questions/11232230/logging-to-two-files-with-different-settings
 def set_logging(logging, filename):
 	if not os.path.isdir("logs"):
 		os.makedirs("logs")
