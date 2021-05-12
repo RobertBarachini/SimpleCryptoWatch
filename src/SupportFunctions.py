@@ -1,19 +1,24 @@
 import os
 import config
+import logging
 # from dotenv import load_dotenv
 
-# TODO fix logging in separate files as done in https://stackoverflow.com/questions/11232230/logging-to-two-files-with-different-settings
-def set_logging(logging, filename):
+def set_logging(filename):
 	if not os.path.isdir("logs"):
 		os.makedirs("logs")
+	handler = logging.FileHandler(f'logs/{filename}.log', mode="a+", encoding="utf-8")      
+	formatter = logging.Formatter('%(asctime)s.%(msecs)03d %(levelname)-8s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')  
+	handler.setFormatter(formatter)
+	logger = logging.getLogger(filename)
 	level = None
 	if config.environment == "debug":
 		level = logging.INFO
 	else: 
 		level = logging.DEBUG
-	# encoding can be used with Python 3.9, not 3.7 ; encoding='utf-8'
-	logging.basicConfig(filename=f'logs/{filename}.log', level=level, filemode="a+", format='%(asctime)s.%(msecs)03d %(levelname)-8s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-	logging.info(f"Set up logging for '{filename}' with level '{level}'")
+	logger.setLevel(level)
+	logger.addHandler(handler)
+	logger.info(f"Set up logging for '{filename}' with level '{level}'")
+	return logger
 
 def get_env_var(varname, require_input=False, input_str=None):
 	try:

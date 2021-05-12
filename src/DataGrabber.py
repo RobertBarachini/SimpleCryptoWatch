@@ -1,17 +1,17 @@
-# Used for getting data from different API endpoints and writing it to th DB
+# Used for getting data from different API endpoints and writing it to the DB
 
 import CryptoAPI as ca
 import config
 import time
 import ENV
 import SupportFunctions as sf
-import logging as log
+# import logging as log
 import DatabaseConnector as db
 import json
 import datetime as dt
 import time
 
-sf.set_logging(log, "DataGrabber")
+log = sf.set_logging("DataGrabber")
 
 # def get_crypto_list():
 
@@ -20,7 +20,6 @@ def save_crypto_listing(data):
 
 def main_loop():
 	# TODO actually do this stuff with events not thread.sleep or something like that
-	# TODO add DB support
 	db.create_table(config.tablename_livelistings, "id serial PRIMARY KEY, datetime_added timestamptz, data json")
 	while True:
 		log.info("Updating Coinmarketcap live listings.")
@@ -35,7 +34,6 @@ def main_loop():
 				log.info(f"Trouble fetching live listings. Data: {data}")
 		else:
 			data = data[2]
-		# TODO save this stuff to DB
 		log.info("Updated Coinmarketcap live listings.")
 		break
 		time.sleep(config.interval_coinmarketcap)

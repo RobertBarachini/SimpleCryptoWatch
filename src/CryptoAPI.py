@@ -1,13 +1,15 @@
+# Implements functions that actually connect to APIs
+
 from requests import Request, Session
 from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
 import json
 import os
 import ENV
 import SupportFunctions as sf
-import logging as log
+# import logging as log
 import config
 
-sf.set_logging(log, "CryptoAPI")
+log = sf.set_logging("CryptoAPI")
 
 def get_data_coinmarketcap(url, parameters=None):
 	headers = {

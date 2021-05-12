@@ -7,12 +7,12 @@ import SupportFunctions as sf
 import psycopg2
 from psycopg2.extras import Json, DictCursor
 import json
-import logging as log
+# import logging as log
 import config
 import time
 import datetime
 
-sf.set_logging(log, "DatabaseConnector")
+log = sf.set_logging("DatabaseConnector")
 
 conn = None
 cur = None
@@ -23,15 +23,10 @@ def init_conn(database, user, password, host, port, can_create=True):
 	try:
 		conn = psycopg2.connect(database=database, user=user, password=password, host=host, port=port)
 		cur = conn.cursor()
-		# cur.execute(f"SET TIME ZONE {time.tzname[time.localtime().tm_isdst]};")
-		# cur.execute(f"SET TIME ZONE '{datetime.datetime.now(datetime.timezone.utc).astimezone().tzname()}';")
-		# print( conn.cursor().connection.get_parameter_status("TimeZone") )
-		# cur.execute(f"SET TIME ZONE '{conn.cursor().connection.get_parameter_status('TimeZone')}';")
-		# print( conn.cursor().connection.get_parameter_status("TimeZone") )
 	except Exception as e:
 		log.error(e)
 		# If connection was established but the database does not exist we can try to create it and retry
-		# otherwise throw exception
+		# otherwise throw an exception
 		if can_create and "does not exist" in str(e):
 			create_db(database, user, password, host, port)
 			# Retry connection
@@ -97,7 +92,6 @@ def rollback():
 		raise e
 
 def insert_into(name, tx, data=None, auto_commit=True):
-	# cur.execute('INSERT into live_listings (datetime_added, data) values (%s, %s)', [dt.datetime.now(), Json(data)])
 	tx = f"INSERT INTO {name} {tx};"
 	try:
 		log.info(f"Inserting into table '{name}' tx={tx}.")
@@ -107,8 +101,6 @@ def insert_into(name, tx, data=None, auto_commit=True):
 	except Exception as e:
 		log.error(e)
 		log.error(f"Tx: {tx} ; Data: {data}")
-		# You did an oopsie - try to rollback
-		# if "commands ignored until end of transaction block" in str(e):
 		rollback()
 
 def select_first(name):
