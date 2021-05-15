@@ -3,6 +3,7 @@
 
 # Local environmental variables
 .env
+src/.env
 
 # VS Code
 .vscode/

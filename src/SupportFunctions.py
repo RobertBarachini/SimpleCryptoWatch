@@ -1,7 +1,8 @@
 import os
 import config
 import logging
-# from dotenv import load_dotenv
+from dotenv import load_dotenv
+load_dotenv()
 
 def set_logging(filename):
 	if not os.path.isdir("logs"):
@@ -17,6 +18,7 @@ def set_logging(filename):
 		level = logging.DEBUG
 	logger.setLevel(level)
 	logger.addHandler(handler)
+	logger.info("\n")
 	logger.info(f"Set up logging for '{filename}' with level '{level}'")
 	return logger
 

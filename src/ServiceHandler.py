@@ -26,7 +26,7 @@ def service_status(name):
 	try:
 		log.info(f"Checking status for service '{name}'")
 		rez = win32serviceutil.QueryServiceStatus(name, machine)
-		log.info(f"Service '{name}' running: '{rez}'")
+		log.info(f"Service '{name}' status: '{rez}'")
 		return rez
 	except Exception as e:
 		log.error(e)

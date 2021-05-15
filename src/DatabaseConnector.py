@@ -2,17 +2,29 @@
 
 # TODO Close DB connection on exit
 
-import ENV
+
 import SupportFunctions as sf
+log = sf.set_logging("DatabaseConnector")
+
+import sys
+for arg in sys.argv:
+	log.info(f"arg: '{arg}'")
+
+
+import os
+log.info(f"CWD: '{os.getcwd()}'")
+
+log.info("importing ENV")
+import ENV
+log.info("importing psycopg2")
 import psycopg2
+log.info("importing psycopg2 extras")
 from psycopg2.extras import Json, DictCursor
 import json
 # import logging as log
 import config
 import time
 import datetime
-
-log = sf.set_logging("DatabaseConnector")
 
 conn = None
 cur = None
