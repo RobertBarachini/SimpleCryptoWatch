@@ -47,8 +47,8 @@ class SimpleCryptoWatchService(SMWinservice):
 	def stop(self):
 		log.info("Stopping service")
 		self.isrunning = False
-		log.info("Calling quit")
-		quit(0)
+		# log.info("Calling quit")
+		# quit(0)
 		# sys.exit(0)
 		# raise SystemExit(0)
 
@@ -61,6 +61,7 @@ class SimpleCryptoWatchService(SMWinservice):
 			# time.sleep(config.interval_coinmarketcap)
 			# TODO add the time it takes to finish dg.update... into account when computing time to sleep
 			# TODO use events/interrupts to quit
+			# TODO get how long you should wait from update_coinmarketcap_listings
 			log.info("Updated Coinmarketcap live listings")
 			max_time_to_wait = round(config.interval_coinmarketcap)
 			log.info(f"Max wait time set to '{max_time_to_wait}'")

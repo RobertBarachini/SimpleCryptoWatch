@@ -34,6 +34,8 @@ def update_coinmarketcap_listings():
 	else:
 		data = data[2]
 	log.info("Updated Coinmarketcap live listings.")
+	
+	# TODO return suggested time to wait before next repeated call 
 
 if __name__ == "__main__":
 	update_coinmarketcap_listings()

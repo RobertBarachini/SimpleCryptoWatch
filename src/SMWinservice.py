@@ -68,8 +68,8 @@ class SMWinservice(win32serviceutil.ServiceFramework):
 		log.info(f"Setting '{hWaitStop}' event")
 		win32event.SetEvent(self.hWaitStop)
 		log.info("Set stop event")
-		log.info("Calling quit")
-		quit(0)
+		# log.info("Calling quit")
+		# quit(0)
 
 	def SvcDoRun(self):
 		'''
