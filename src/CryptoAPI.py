@@ -40,6 +40,12 @@ def get_live_listings_coinmarketcap(parameters={'limit':f'{config.coinmarketcap_
 	url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
 	data = get_data_coinmarketcap(url, parameters)
 	return data
+
+def get_cryptomapping(parameters=None):
+	log.info("Checking Coinmarketcap crypto mapping")
+	url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/map'
+	data = get_data_coinmarketcap(url, parameters)
+	return data
 	
 # TODO
 # Create a folder named 'temp' and store all last request results there in json

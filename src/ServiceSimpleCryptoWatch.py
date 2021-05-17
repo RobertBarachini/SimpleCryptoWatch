@@ -54,10 +54,10 @@ class SimpleCryptoWatchService(SMWinservice):
 
 	def main(self):
 		log.info("Started main")
-		db.create_table(config.tablename_livelistings, "id serial PRIMARY KEY, datetime_added timestamptz, data json")
+		# db.create_table(config.tablename_livelistings, "id serial PRIMARY KEY, datetime_added timestamptz, data json")
 		while self.isrunning: #not exit_event.is_set() and self.isrunning:
 			log.info("Updating Coinmarketcap live listings")
-			dg.update_coinmarketcap_listings()
+			dg.get_coinmarketcap_listings()
 			# time.sleep(config.interval_coinmarketcap)
 			# TODO add the time it takes to finish dg.update... into account when computing time to sleep
 			# TODO use events/interrupts to quit

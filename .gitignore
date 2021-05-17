@@ -23,3 +23,6 @@ src/demo/
 build/
 dist/
 MainForm.spec
+
+# Resources (images and stuff (from web))
+res/web/
