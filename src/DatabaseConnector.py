@@ -1,8 +1,19 @@
 # Handles DB connections and CRUD operations
 
-# TODO Close DB connection on exit
+# Handle on exit
+import atexit
+def exit_handler():
+	try:
+		log.info("In exit handler...closing cursor and connection")
+		cur.close()
+		conn.close()
+		log.info("Closed cursor and connection - exiting")
+	except Exception as e:
+		log.error("Error occured when calling exit handler")
+		log.error(e)
+atexit.register(exit_handler)
 
-
+from configparser import Error
 import SupportFunctions as sf
 log = sf.set_logging("DatabaseConnector")
 
@@ -28,6 +39,23 @@ import datetime
 
 conn = None
 cur = None
+
+def to_dict(rows, colnames):
+	if len(rows) == 0:
+		return rows
+	if len(rows[0]) != len(colnames):
+		raise ValueError("Number of columns in a row doesn't match the number of columns in colnames")
+	res = []
+	for row in rows:
+		rown = {}
+		for index, name in zip(range(0, len(colnames)), colnames):
+			rown[name] = row[index]
+		res.append(rown)
+	return res
+
+# a = to_dict([[1, "b", "lmfao"], [2, "c", "lmoa"]], ["id", "name", "neki"])
+# b = to_dict([[1, "b", "lmfao"], [2, "c", "lmoa"]], ["id", "name", "neki", "smh"])
+# yo = 0
 
 def init_conn(database, user, password, host, port, can_create=True):
 	global conn

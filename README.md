@@ -1,3 +1,7 @@
-# Sample text
+# Watch your portfolio tank from the comfort of your desktop environment
 
-Some random text
+🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀
+
+# Setup
+
+# Usage
