@@ -149,8 +149,8 @@ def select_first(name):
 def select_last(name):
 	return select_from(name, nrows=1, reversed=True)
 
-def select_from(name, nrows=-1, reversed=False):
-	tx = f"SELECT * FROM {name}{'' if not reversed else ' ORDER BY id DESC'};"
+def select_from(name, nrows=-1, reversed=False, conditions=""):
+	tx = f"SELECT * FROM {name}{conditions}{'' if not reversed else ' ORDER BY id DESC'};"
 	try:
 		log.info(f"Selecting from table '{name}'")
 		cur.execute(tx)
