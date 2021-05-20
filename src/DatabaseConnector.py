@@ -168,6 +168,31 @@ def select_from(name, nrows=-1, reversed=False, conditions=""):
 		log.error(f"Tx: {tx}")
 		rollback()
 
+# Updates a db record
+def update_at(tablename, tx, data=None, auto_commit=True):
+	tx = f"UPDATE {tablename} SET {tx};"
+	try:
+		log.info(f"Updating in table '{tablename}' tx={tx}.")
+		cur.execute(tx, data)
+		if auto_commit:
+			conn.commit()
+	except Exception as e:
+		log.error(e)
+		log.error(f"Tx: {tx} ; Data: {data}")
+		rollback()
+
+def delete_from(tablename, tx, data=None, auto_commit=True):
+	tx = f"DELETE FROM {tablename} WHERE {tx};"
+	try:
+		log.info(f"Removing from table '{tablename}' tx={tx}.")
+		cur.execute(tx, data)
+		if auto_commit:
+			conn.commit()
+	except Exception as e:
+		log.error(e)
+		log.error(f"Tx: {tx} ; Data: {data}")
+		rollback()
+
 if __name__ == "__main__":
 	log.info(f"Started '__main__' of '{__file__:s}'")
 

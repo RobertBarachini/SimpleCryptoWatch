@@ -1,3 +1,4 @@
+from sys import hash_info
 import PySimpleGUI as sg
 # import MainFormLayout
 import os
@@ -31,13 +32,15 @@ w = None
 refresh_window = True
 w_size = (1680, 980)
 w_pos = (150, 40)
-selected_key = None
 col_listings_color = "#F9FBFD"
+col_bg_2 = "#ebf0fa"
 col_viewing_color = "#FFE4E1"
 col_listings_color_back = "#EBEEF3"
 color_accent_main = "#5079D3"
 color_selected = "Slategray1"
 color_deselected = col_listings_color
+color_change_positive = "#4bd37b"
+color_change_negative = "#d3574b"
 font_family = 'Cascadia Code'
 font_size = 14
 font = (font_family, font_size)
@@ -51,7 +54,10 @@ listings_data = {}
 last_update_at = "/"
 collections = {} # Obtained from portfolios - keys are collection names values are dictionaries where each dictionary has coin ids for keys and quantity of said coin as values
 timeseries = None
+selected_coin_listing = {}
 selected_coin_id = 1 # 1 = bitcoin ; 1027 = ethereum
+coins_viewable = 20 # 20
+listings_history = 40 # 300
 
 # DB
 # Default user ensures out of the box functionality but should not be used if you plan on storing portfolio data
@@ -110,7 +116,8 @@ def db_create_portfolio_entry(coin_id, quantity):
 
 def db_get_portfolio_entries():
 	user_id = user["id"]
-	entries = db.select_from(config.tablename_portfolios, conditions=f" WHERE user_id = '{user_id}' AND collection = '{collection}' ")
+	#entries = db.select_from(config.tablename_portfolios, conditions=f" WHERE user_id = '{user_id}' AND collection = '{collection}' ")
+	entries = db.select_from(config.tablename_portfolios, conditions=f" WHERE user_id = '{user_id}' ")
 	return entries
 
 ### END OF DB SPECIFIC STUFF
@@ -128,6 +135,7 @@ def login_user(username, password):
 	
 # Login the DEFAULT user
 user = login_user(user_default_username, user_default_pass)
+log.info("Logged in default user")
 
 # Test portfolios
 # db_create_table_portfolios()
@@ -148,6 +156,86 @@ user = login_user(user_default_username, user_default_pass)
 # portfolio_entries4 = db_get_portfolio_entries()
 # print("Tested portfolios")
 
+# Get portfolio entries
+def generate_collections():
+	db_create_table_portfolios()
+	global collection
+	global collections
+	collections = {}
+	db_portfolio_entries = db_get_portfolio_entries()
+	# Ensure there is always at least the default collection (even if it has 0 value)
+	if len(db_portfolio_entries) == 0:
+		db_create_portfolio_entry(1, 0)
+		db_portfolio_entries = db_get_portfolio_entries()
+	for entry in db_portfolio_entries:
+		collection_name = entry[3]
+		if not collection_name in collections:
+			collections[collection_name] = {}
+		collections[collection_name][entry[2]] = entry[4]
+	if collection not in collections:
+		if len(collections.keys()) > 0:
+			collection = list(collections.keys())[0]
+		else:
+			collection = collection_default_name
+	return collections
+
+def update_holding():
+	input_text = w.ReturnValuesDictionary["input_holding"]
+	# Check if user input a number and update the db portfolios record else just reset to default input value
+	try:
+		input_val = float(input_text)
+		db.update_at(config.tablename_portfolios, "quantity=%s WHERE user_id=%s AND coin_id=%s AND collection=%s", [input_val, user["id"], selected_coin_id, collection])
+		generate_collections()
+		update_info()
+	except Exception as e:
+		w["input_holding"].update(w["input_holding"].DefaultText)
+
+def remove_holding(coin_id):
+	db.delete_from(config.tablename_portfolios, "user_id=%s AND coin_id=%s AND collection=%s", [user["id"], coin_id, collection])
+	generate_collections()
+	update_info()
+
+# Generate collections and their coins and holdings quantities
+collections = generate_collections()
+log.info("Got collections from portfolios")
+
+# VERY suboptimal but works for now
+def get_timeseries():
+	listings = list(reversed(db.select_from("live_listings", nrows=listings_history, reversed=True)))
+	global timeseries
+	timeseries = {}
+	counter = 0 
+	for listing in listings:
+		for coin in listing[2]["data"]:
+			coin_id = coin["id"]
+			if not coin_id in timeseries:
+				timeseries[coin_id] = {}
+				timeseries[coin_id]["timestamps"] = []
+				timeseries[coin_id]["prices"] = []
+			timeseries[coin_id]["timestamps"].append(datetime.datetime.strptime(coin["last_updated"], '%Y-%m-%dT%H:%M:%S.%fZ'))
+			timeseries[coin_id]["prices"].append(coin["quote"]["EUR"]["price"])
+		if counter >= listings_history: # limit when testing
+			break
+		counter += 1
+	return timeseries
+
+# Test timeseries
+tajm = get_timeseries()
+log.info("Got timeseries")
+
+# Time series to OHLC conversions
+# def timeseries_to_OHLC(timestamps, prices):
+# 	df = pd.DataFrame({"Timestamps": timestamps, "Prices": prices})
+# 	print(df)
+# 	df.resample('5M').agg({'openbid': 'first', 
+# 													'highbid': 'max', 
+# 													'lowbid': 'min', 
+# 													'closebid': 'last'})
+# 	print(df)
+	
+# ether_timeseries = timeseries[1027]
+# ohlc_test = timeseries_to_OHLC(ether_timeseries["timestamps"], ether_timeseries["prices"])
+# print("Done generating OHLC from timeseries")
 
 ### Graphing
 
@@ -171,6 +259,9 @@ def draw_figure_w_toolbar(canvas, fig, canvas_toolbar):
 def draw_graph():
 	if timeseries == None:
 		return None
+	plt.clf()
+	plt.clf()
+	plt.close()
 	plt.figure(1)
 	# fig = plt.gcf()
 	fig, ax = plt.subplots()
@@ -207,51 +298,12 @@ def draw_graph():
 	fig.autofmt_xdate()
 	ax.fmt_xdata = mdates.DateFormatter('%Y-%m-%d %H:%M:%S')
 
-	plt.title(str(selected_coin_id))
+	plt.title(listings_data[selected_coin_id]["name"])
 	plt.xlabel("time")
 	plt.ylabel('price')
 	plt.grid()
+	plt.subplots_adjust(left=0.085, bottom=None, right=0.97, top=0.95, wspace=None, hspace=None)
 	draw_figure_w_toolbar(w['fig_cv'].TKCanvas, fig, w['controls_cv'].TKCanvas)
-
-#
-
-# VERY suboptimal but works for now
-def get_timeseries():
-	listings = db.select_from("live_listings")
-	global timeseries
-	timeseries = {}
-	counter = 0 
-	for listing in listings:
-		for coin in listing[2]["data"]:
-			coin_id = coin["id"]
-			if not coin_id in timeseries:
-				timeseries[coin_id] = {}
-				timeseries[coin_id]["timestamps"] = []
-				timeseries[coin_id]["prices"] = []
-			timeseries[coin_id]["timestamps"].append(datetime.datetime.strptime(coin["last_updated"], '%Y-%m-%dT%H:%M:%S.%fZ'))
-			timeseries[coin_id]["prices"].append(coin["quote"]["EUR"]["price"])
-		# if counter >= 10: # limit when testing
-		# 	break
-		counter += 1
-	return timeseries
-
-# Test timeseries
-tajm = get_timeseries()
-print("Got timeseries")
-
-# Time series to OHLC conversions
-# def timeseries_to_OHLC(timestamps, prices):
-# 	df = pd.DataFrame({"Timestamps": timestamps, "Prices": prices})
-# 	print(df)
-# 	df.resample('5M').agg({'openbid': 'first', 
-# 													'highbid': 'max', 
-# 													'lowbid': 'min', 
-# 													'closebid': 'last'})
-# 	print(df)
-	
-# ether_timeseries = timeseries[1027]
-# ohlc_test = timeseries_to_OHLC(ether_timeseries["timestamps"], ether_timeseries["prices"])
-# print("Done generating OHLC from timeseries")
 
 ### End of Graphing
 
@@ -280,9 +332,9 @@ def get_image_path(id):
 def get_change_color(change_val):
 	color = "black"
 	if change_val > 0:
-		color = "#4bd37b"
+		color = color_change_positive
 	if change_val < 0:
-		color = "#d3574b"
+		color = color_change_negative
 	return color
 
 def get_change_text(change_val):
@@ -294,10 +346,6 @@ def get_change_text(change_val):
 		# 	return f"+ {change_val}%"
 		# else:
 		# 	return f"- {change_val}%"
-
-def generate_collections():
-	global collections
-
 
 # Build main layout when the main window is being created
 # This can be either be called at program start or when redrawing new layout
@@ -314,7 +362,7 @@ def build_main_layout():
 	win_h = w_size[1] #px_to_char_h(w_size[1])
 	menubar_w = win_w
 	menubar_h = 50
-	col_listings_w = 550
+	col_listings_w = 580
 	col_listings_h = win_h - menubar_h
 	tracked_listings_table = []
 	all_listings_table = []
@@ -323,14 +371,23 @@ def build_main_layout():
 
 	padd = 5
 	for listing in listings:
+		in_collection = is_in_collection(listing["id"])
 		listings_data[listing["id"]] = listing
 		img_path = get_image_path(listing["id"])
 		ltext = f"{listing['name']}\n{listing['quote']['EUR']['price']:.2f} €"
 		view_button = sg.Button(button_text="🔍", button_color="Slateblue1", pad=(padd, padd), size=(2, 1), font=(font_family, 12))
-		add_button = sg.Button(button_text="➕", button_color=get_change_color(1), pad=(padd, padd), size=(2,1), font=(font_family, 12))
+		add_button_text = ""
+		add_button_color = ()
+		if in_collection:
+			add_button_text = "➖"
+			add_button_color = color_change_negative
+		else:
+			add_button_text = "➕"
+			add_button_color = color_change_positive
+		add_button = sg.Button(button_text=add_button_text, button_color=add_button_color, pad=(padd, padd), size=(2,1), font=(font_family, 12), key=f"add_button-{listing['id']}")
 		# crypto_img = sg.Image(filename="res/prog/missing_crypto.png", size=(64, 64), pad=(padd, padd), background_color=col_listings_color)
 		crypto_img = sg.Image(filename=img_path, size=(64, 64), pad=(padd, padd), background_color=col_listings_color)
-		crypto_text = sg.Text(ltext, background_color=col_listings_color, pad=(padd, padd), size=(20, None), enable_events=True, key=f"crypto_text-{listing['id']}")
+		crypto_text = sg.Text(ltext, background_color=col_listings_color, pad=(padd * 2, padd), size=(20, None), enable_events=True, key=f"crypto_text-{listing['id']}")
 		t24h = sg.Text("24h:", justification="r", size=(4, None), pad=(padd, padd), background_color=col_listings_color)
 		t7d = sg.Text("7d:", justification="r", size=(4, None), pad=(padd, padd), background_color=col_listings_color)
 		change_24h = listing["quote"]["EUR"]["percent_change_24h"]
@@ -357,12 +414,12 @@ def build_main_layout():
 					[
 						[text_delta_24h],
 						[text_delta_7d]
-					], pad=(0,0), background_color=col_listings_color
+					], pad=(padd * 2,0), background_color=col_listings_color
 				)
 			]], pad=(padd, padd), background_color=col_listings_color)]
 		)
 		i += 1
-		if i >= 20:
+		if i >= coins_viewable:
 			break
 
 	listings_topbar_layout = [
@@ -373,10 +430,10 @@ def build_main_layout():
 	listings_topbar = sg.Column(listings_topbar_layout, pad=(0, 0), element_justification='center', key="listings_topbar", size=(col_listings_w, 150), background_color=col_listings_color, justification="center")
 
 	listings_table_layout = [
-		[sg.Text(f"Portfolio ({len(tracked_listings_table)})", pad=(padd + 10, padd + 10), font=(font_family, 20), background_color=col_listings_color)],
-		[sg.Column(tracked_listings_table, background_color=col_listings_color)],
-		[sg.Text(f"All crypto ({len(all_listings_table)})", pad=(padd + 10, padd + 10), font=(font_family, 20), background_color=col_listings_color)],
-		[sg.Column(all_listings_table, background_color=col_listings_color)]
+		[sg.Text(f"Portfolio ({len(collections[collection].keys())})", pad=(padd + 10, padd + 10), font=(font_family, 20), background_color=col_bg_2)],
+		[sg.Column(tracked_listings_table, background_color=col_bg_2)],
+		[sg.Text(f"All crypto ({len(all_listings_table)})", pad=(padd + 10, padd + 10), font=(font_family, 20), background_color=col_bg_2)],
+		[sg.Column(all_listings_table, background_color=col_bg_2)]
 	]
 
 	col_listings_layout = [
@@ -386,7 +443,7 @@ def build_main_layout():
 		[
 			# 18 needed to subtract from sizes to adjust for the scrollbars (there seems to be a bug in the pysimplegui box model)
 			# Also there is 1px of top,left offest even if setting all padding to (0, 0)
-			sg.Column(listings_table_layout, pad=(0, 0), element_justification='l', key="listings_list", size=(col_listings_w - 18, col_listings_h-listings_topbar.Size[1] - 18), scrollable=True, background_color=col_listings_color)
+			sg.Column(listings_table_layout, pad=(0, 0), element_justification='l', key="listings_list", size=(col_listings_w - 18, col_listings_h-listings_topbar.Size[1] - 18), scrollable=True, background_color=col_bg_2)
 		]
 	]
 
@@ -413,7 +470,7 @@ def build_main_layout():
 				background_color=col_listings_color,
 				pad=(0, 0), size=(graph_w, graph_h))
 			],
-			[sg.Button('Plot'), sg.Canvas(key='controls_cv', background_color=col_listings_color)],
+			[sg.Canvas(key='controls_cv', background_color=col_listings_color)],
 		]
 
 	# graphing_layout = [
@@ -435,17 +492,42 @@ def build_main_layout():
   #   [sg.Button('Alive?')]
 	# ]
 
+	details_layout = [
+		[
+			sg.Button("Update", size=(8, 1), pad=(padd * 2, padd), button_color=(col_listings_color, color_accent_main), key="update_holding"),
+			sg.Button("Add", size=(8, 1), pad=(padd * 2, padd), button_color=(col_listings_color, color_accent_main), key="addremove_button_info"),
+			sg.Text(f"Value: 0 €", pad=(padd, padd), background_color=col_listings_color, key="holding_value", size=(30, 1)),
+			
+		],
+		[
+			sg.Text("Holding quantity:", pad=(padd, padd), background_color=col_listings_color),
+			sg.Input(default_text="0", size=(10, 1), justification="l", pad=(padd, padd), background_color=col_listings_color, text_color=color_accent_main, key="input_holding"),
+			sg.Text("Collection: ", size=(30, 1), pad=(padd, padd), background_color=col_listings_color, key="text_collection")
+		]
+	]
+
 	col_viewing_layout = [
 		[
 			sg.Column(graphing_layout, background_color=col_listings_color, size=(col_viewing_w, col_viewing_h - details_h))
 		],
 		[
-			sg.Column([[sg.Text("Details")]], background_color=col_listings_color, size=(col_viewing_w, details_h))
+			sg.Column(details_layout, background_color=col_listings_color, size=(col_viewing_w, details_h), pad=(padd*2, padd*2))
 		]
 	]
 	# col_graphing=[[sg.Text('Graphing', background_color='green', size=(1,1))]]
+	
+	menubar_layout = [
+		[
+			sg.Column([
+				[
+					sg.Button("Login", button_color=(color_accent_main, col_listings_color), border_width=0, key="login", auto_size_button=True, pad=(padd, padd)),
+					sg.Text(f"👤: {user['username']}", key="username", text_color=col_listings_color, background_color=color_accent_main, auto_size_text=True, justification="r", pad=(padd * 2, padd))
+				]
+				], background_color=color_accent_main, pad=(padd, None), vertical_alignment="c", justification="r", element_justification="r")
+		]
+	]
 
-	menubar = sg.Column([[sg.Text("Menu test")]], background_color=color_accent_main, size=(menubar_w, menubar_h))
+	menubar = sg.Column(menubar_layout, background_color=color_accent_main, size=(menubar_w, menubar_h), vertical_alignment="c", justification="r", element_justification="r")
 
 	main_layout = [
 		[
@@ -464,6 +546,9 @@ def init_window(name="SimpleCryptoWatch"):
 	global w
 	global w_size
 	global w_pos
+
+	generate_collections()
+
 	font=font
 	temp_w = sg.Window(f"{name} - Initializing", [[sg.Text("Initializing main window\nPlease wait ✨", justification="c", background_color=col_listings_color, text_color="black")]], font=font, return_keyboard_events=True, finalize=True, background_color=col_listings_color, margins=(0, 0), element_padding=None)
 	temp_w.read(timeout=0.001)
@@ -471,10 +556,17 @@ def init_window(name="SimpleCryptoWatch"):
 
 	sg.theme("Material 1")
 	main_layout = build_main_layout()
-	if w_pos:
-		w = sg.Window(name, main_layout, return_keyboard_events=True, finalize=True, font=font, resizable=True, element_padding=(0, 0), margins=(0, 0), background_color=col_listings_color, location=w_pos)
-	else:
-		w = sg.Window(name, main_layout, return_keyboard_events=True, finalize=True, font=font, resizable=True, element_padding=(0, 0), margins=(0, 0), background_color=col_listings_color)
+	w = sg.Window(name, 
+		main_layout, 
+		return_keyboard_events=True, 
+		finalize=True, font=font, 
+		resizable=True, 
+		element_padding=(0, 0), 
+		margins=(0, 0), 
+		background_color=col_listings_color, 
+		element_justification="c", 
+		location=w_pos)
+	
 	if w_size:
 		w.size = w_size
 	else:
@@ -490,7 +582,7 @@ def init_window(name="SimpleCryptoWatch"):
 	w.bind('<Configure>', "sizemoved")
 	w.BringToFront()
 	temp_w.close()
-	draw_graph()
+	update_info()
 	return w
 
 # Handles moving and resizing of the window - used for later redrawing
@@ -505,6 +597,78 @@ def handle_window_sizemoved():
 	cur_loc = w.current_location()
 	if w_pos[0] != cur_loc[0] or w_pos[1] != cur_loc[1]:
 		w_pos = cur_loc
+
+def update_info(coin_id=None):
+	global selected_coin_id
+	global selected_coin_listing
+	# if coin_id == None:
+	
+	# Deselect previously selected
+	w[f"crypto_text-{selected_coin_id}"].update(background_color=color_deselected)
+	if coin_id != None:
+		selected_coin_id = coin_id
+	# Select current
+	w[f"crypto_text-{selected_coin_id}"].update(background_color=color_selected)
+	selected_coin_listing = listings_data[selected_coin_id]
+	# Update info
+	holding_val = 0
+	if is_in_collection(selected_coin_id):
+		holding_val = float(collections[collection][selected_coin_id])
+		input_holding = w.FindElement('input_holding')
+		# Why can't I update these basic element properties dynamically... so limiting
+		# input_holding.Update(size=(min(8, len(str(holding_val)) + 3), 1))
+		input_holding.Update(f"{str(holding_val)}")
+	el_holding_value = w["holding_value"]
+	price = selected_coin_listing['quote']['EUR']['price']
+	el_holding_value.update(f"Value: {(holding_val * price):.2f} €")
+	# Update add remove button in details
+	addremove_button = w["addremove_button_info"]
+	addremove_button_text = ""
+	addremove_button_color = None
+	if is_in_collection(selected_coin_id):
+		addremove_button_text = "Remove"
+		addremove_button_color = color_change_negative
+	else:
+		addremove_button_text = "Add"
+		addremove_button_color = color_change_positive
+	addremove_button.update(text=addremove_button_text)
+	addremove_button.update(button_color=addremove_button_color)
+	# Update collection text
+	w["text_collection"].update(f"Collection: {collection}")
+	# Update graph
+	draw_graph()
+
+def get_coin_id(event):
+	return int(event[event.rindex("-")+1:])
+
+def add_coin(coin_id, quantity=0):
+	db_create_portfolio_entry(coin_id, quantity)
+	generate_collections()
+	update_info()
+
+def remove_coin(coin_id):
+	# TODO implement db_remove_portfolio_entry
+	remove_holding(coin_id)
+	generate_collections()
+	update_info()
+
+def addremove_coin(coin_id):
+	if is_in_collection(coin_id):
+		remove_coin(coin_id)
+	else:
+		add_coin(coin_id)
+	# Then check again and update the + - button
+	if is_in_collection(coin_id):
+		w[f"add_button-{coin_id}"].update(text="➖")
+		w[f"add_button-{coin_id}"].update(button_color=color_change_negative)
+	else:
+		w[f"add_button-{coin_id}"].update(text="➕")
+		w[f"add_button-{coin_id}"].update(button_color=color_change_positive)
+
+def is_in_collection(coin_id):
+	return collection in collections and coin_id in collections[collection]
+
+
 
 def main_loop():
 	global refresh_window
@@ -553,15 +717,16 @@ def main_loop():
 
 		# Check if a specific row in crypto listings has been clicked to be selected for detailed viewing
 		if "crypto_text" in event:
-			global selected_key
-			global selected_coin_id
-			if selected_key != event:
-				w[event].update(background_color=color_selected)
-				if selected_key != None:
-					w[selected_key].update(background_color=color_deselected)
-				selected_key = event
-				selected_coin_id = int(selected_key[selected_key.rindex("-")+1:])
-				draw_graph()
+			coin_id = get_coin_id(event)
+			if coin_id != selected_coin_id:
+				update_info(coin_id)
+
+		# Add / remove coin from collection
+		if "add_button" in event:
+			addremove_coin(get_coin_id(event))
+
+		if "addremove_button_info" in event:
+			addremove_coin(selected_coin_id)
 
 		if event == "sizemoved":
 			handle_window_sizemoved()
@@ -569,6 +734,9 @@ def main_loop():
 		# if event == "Button":
 		# 	MainFormLayout.main_layout.append([sg.Text('This is a very basic PySimpleGUI layout')])
 		# 	refresh_window = True
+
+		if "update_holding" in event:
+			update_holding()
 
 		# Graphing
 		if event is 'Plot':
