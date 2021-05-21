@@ -48,6 +48,8 @@ graph_w = 100
 graph_h = 50
 plt.rcParams["font.family"] = font_family
 plt.rcParams['font.size'] = font_size
+can_auto_update = False
+first_init = True
 
 # Stores listings data where keys are crypto coin IDs and values are listings for each separate coin
 listings_data = {}
@@ -57,7 +59,7 @@ timeseries = None
 selected_coin_listing = {}
 selected_coin_id = 1 # 1 = bitcoin ; 1027 = ethereum
 coins_viewable = 20 # 20
-listings_history = 40 # 300
+listings_history = 4000 # 300
 
 # DB
 # Default user ensures out of the box functionality but should not be used if you plan on storing portfolio data
@@ -184,6 +186,8 @@ def update_holding():
 	# Check if user input a number and update the db portfolios record else just reset to default input value
 	try:
 		input_val = float(input_text)
+		# Create if it doesn't already exist
+		db_create_portfolio_entry(selected_coin_id, 0)
 		db.update_at(config.tablename_portfolios, "quantity=%s WHERE user_id=%s AND coin_id=%s AND collection=%s", [input_val, user["id"], selected_coin_id, collection])
 		generate_collections()
 		update_info()
@@ -200,12 +204,12 @@ collections = generate_collections()
 log.info("Got collections from portfolios")
 
 # VERY suboptimal but works for now
-def get_timeseries():
-	listings = list(reversed(db.select_from("live_listings", nrows=listings_history, reversed=True)))
+def generate_timeseries():
+	listings_all = list(reversed(db.select_from("live_listings", nrows=listings_history, reversed=True)))
 	global timeseries
 	timeseries = {}
 	counter = 0 
-	for listing in listings:
+	for listing in listings_all:
 		for coin in listing[2]["data"]:
 			coin_id = coin["id"]
 			if not coin_id in timeseries:
@@ -218,10 +222,6 @@ def get_timeseries():
 			break
 		counter += 1
 	return timeseries
-
-# Test timeseries
-tajm = get_timeseries()
-log.info("Got timeseries")
 
 # Time series to OHLC conversions
 # def timeseries_to_OHLC(timestamps, prices):
@@ -274,6 +274,19 @@ def draw_graph():
 	x = range(len(y))
 	dates = timeseries[selected_coin_id]["timestamps"]
 
+	# Prepare daily slices
+	day_slices_timestamps = []
+	day_slices_prices = []
+	current_day = -1
+	for price, timestamp in zip(y, dates):
+		day = timestamp.day
+		if day != current_day:
+			current_day = day
+			day_slices_prices.append([])
+			day_slices_timestamps.append([])
+		day_slices_prices[len(day_slices_prices) - 1].append(price)
+		day_slices_timestamps[len(day_slices_timestamps) - 1].append(timestamp)
+
 	# z = np.polyfit(x, y, 24)#5 * 4 * 3)#12*5 * 2) # Cetrtletje al pa meseci
 	# z2 = np.polyfit(x, y, 0) # Povprecje
 	# z3 = np.polyfit(x, y, 1) # Trend
@@ -288,8 +301,17 @@ def draw_graph():
 	# pp = ax.plot(dates,p(x), label=(k if pri_opacity >= sec_opacity else ''), alpha=pri_opacity)
 	# last_col = pp[-1].get_color()
 	last_col = color_accent_main
-	ax.plot(dates, y, last_col, label="yoo wtf", alpha=sec_opacity) # Vsi podatki alpha=0.15
+	ax.plot(dates, y, last_col, label="yoo wtf", alpha=sec_opacity, linewidth=1.5) # Vsi podatki alpha=0.15
 	# ax.plot(dates, p2(x))
+
+	# Plot slices
+	for prices, timestamps in zip(day_slices_prices, day_slices_timestamps):
+		col = "#F2CD31" # same open and close price
+		if prices[0] < prices[len(prices) - 1]:
+			col = color_change_positive
+		if prices[0] > prices[len(prices) - 1]:
+			col = color_change_negative
+		ax.plot(timestamps, prices, col, label="", alpha=sec_opacity, linewidth=2.0)
 
 	# To je za debelo crto
 	# ax.plot(dates, p3(x), last_col, linewidth=3.0)
@@ -347,17 +369,28 @@ def get_change_text(change_val):
 		# else:
 		# 	return f"- {change_val}%"
 
+### GENERATE Live listings
+def generate_live_listings():
+	global last_update_at
+	global listings
+	global listings_data
+	listings_data = {}
+	dg_listings = dg.get_coinmarketcap_listings()
+	db_listings = db.select_last("live_listings")
+	listings = dg_listings["data"]
+	for listing in listings:
+		listings_data[listing["id"]] = listing
+	last_update_at = db_listings[1]
+	# Generate timeseries
+	generate_timeseries()
+	log.info("Got timeseries")
+
+
 # Build main layout when the main window is being created
 # This can be either be called at program start or when redrawing new layout
 def build_main_layout():
 	global font
-	global listings_data
-	global last_update_at
-	### GENERATE Live listings
-	dg_listings = dg.get_coinmarketcap_listings()
-	db_listings = db.select_last("live_listings")
-	listings = dg_listings["data"]
-	last_update_at = db_listings[1]
+	generate_live_listings()
 	win_w = w_size[0] #px_to_char_w(w_size[0])
 	win_h = w_size[1] #px_to_char_h(w_size[1])
 	menubar_w = win_w
@@ -367,15 +400,12 @@ def build_main_layout():
 	tracked_listings_table = []
 	all_listings_table = []
 	i = 0
-
-
 	padd = 5
 	for listing in listings:
 		in_collection = is_in_collection(listing["id"])
-		listings_data[listing["id"]] = listing
 		img_path = get_image_path(listing["id"])
 		ltext = f"{listing['name']}\n{listing['quote']['EUR']['price']:.2f} €"
-		view_button = sg.Button(button_text="🔍", button_color="Slateblue1", pad=(padd, padd), size=(2, 1), font=(font_family, 12))
+		view_button = sg.Button(button_text="🔍", button_color="Slateblue1", pad=(padd, padd), size=(2, 1), font=(font_family, 12), key=f"browse_coin-{listing['id']}")
 		add_button_text = ""
 		add_button_color = ()
 		if in_collection:
@@ -423,14 +453,20 @@ def build_main_layout():
 			break
 
 	listings_topbar_layout = [
-			[sg.Text('Live listings', background_color=col_listings_color, key="listings_title", size=(30,3)), sg.Button("+", key="add_text"), sg.Button("-", key="remove_text")],
-			[sg.Column([[sg.Column([[sg.Text("yooo")]], key="yooo")]], key="topbar_texts")]
+			[
+				sg.Text('Live listings', background_color=col_listings_color, key="listings_title", size=(28,2), pad=(padd, padd)), 
+				sg.Check("Auto update", default=can_auto_update, key="auto_update", background_color=col_listings_color, pad=(padd, padd)),
+				sg.Button("Update", key="update_listings", pad=(padd, padd))
+			],
+			[
+				sg.Combo(values=["ena", "dve"], size=(30,3), pad=(padd, padd), auto_size_text=False, background_color=col_listings_color, text_color=color_accent_main, readonly=True, change_submits=True, enable_events=True, key="collections_dropdown")
+			],
 		]
 
 	listings_topbar = sg.Column(listings_topbar_layout, pad=(0, 0), element_justification='center', key="listings_topbar", size=(col_listings_w, 150), background_color=col_listings_color, justification="center")
 
 	listings_table_layout = [
-		[sg.Text(f"Portfolio ({len(collections[collection].keys())})", pad=(padd + 10, padd + 10), font=(font_family, 20), background_color=col_bg_2)],
+		[sg.Text(f"Portfolio ({len(collections[collection].keys())})", pad=(padd + 10, padd + 10), font=(font_family, 20), background_color=col_bg_2, key="portfolio_text")],
 		[sg.Column(tracked_listings_table, background_color=col_bg_2)],
 		[sg.Text(f"All crypto ({len(all_listings_table)})", pad=(padd + 10, padd + 10), font=(font_family, 20), background_color=col_bg_2)],
 		[sg.Column(all_listings_table, background_color=col_bg_2)]
@@ -494,14 +530,13 @@ def build_main_layout():
 
 	details_layout = [
 		[
-			sg.Button("Update", size=(8, 1), pad=(padd * 2, padd), button_color=(col_listings_color, color_accent_main), key="update_holding"),
-			sg.Button("Add", size=(8, 1), pad=(padd * 2, padd), button_color=(col_listings_color, color_accent_main), key="addremove_button_info"),
-			sg.Text(f"Value: 0 €", pad=(padd, padd), background_color=col_listings_color, key="holding_value", size=(30, 1)),
-			
-		],
-		[
 			sg.Text("Holding quantity:", pad=(padd, padd), background_color=col_listings_color),
 			sg.Input(default_text="0", size=(10, 1), justification="l", pad=(padd, padd), background_color=col_listings_color, text_color=color_accent_main, key="input_holding"),
+			sg.Text(f"Value: 0 €", pad=(padd, padd), background_color=col_listings_color, key="holding_value", size=(30, 1)),
+			sg.Button("Update", size=(8, 1), pad=(padd * 2, padd), button_color=(col_listings_color, color_accent_main), key="update_holding"),
+			sg.Button("Add", size=(8, 1), pad=(padd * 2, padd), button_color=(col_listings_color, color_accent_main), key="addremove_button_info")
+		],
+		[
 			sg.Text("Collection: ", size=(30, 1), pad=(padd, padd), background_color=col_listings_color, key="text_collection")
 		]
 	]
@@ -580,7 +615,10 @@ def init_window(name="SimpleCryptoWatch"):
 	w.SetIcon(os.path.abspath("logo.ico"))
 	# Resize event
 	w.bind('<Configure>', "sizemoved")
-	w.BringToFront()
+	global first_init
+	if first_init:
+		first_init = False
+		w.BringToFront()
 	temp_w.close()
 	update_info()
 	return w
@@ -614,10 +652,10 @@ def update_info(coin_id=None):
 	holding_val = 0
 	if is_in_collection(selected_coin_id):
 		holding_val = float(collections[collection][selected_coin_id])
-		input_holding = w.FindElement('input_holding')
-		# Why can't I update these basic element properties dynamically... so limiting
-		# input_holding.Update(size=(min(8, len(str(holding_val)) + 3), 1))
-		input_holding.Update(f"{str(holding_val)}")
+	input_holding = w.FindElement('input_holding')
+	# Why can't I update these basic element properties dynamically... so limiting
+	# input_holding.Update(size=(min(8, len(str(holding_val)) + 3), 1))
+	input_holding.Update(f"{str(holding_val)}")
 	el_holding_value = w["holding_value"]
 	price = selected_coin_listing['quote']['EUR']['price']
 	el_holding_value.update(f"Value: {(holding_val * price):.2f} €")
@@ -635,11 +673,21 @@ def update_info(coin_id=None):
 	addremove_button.update(button_color=addremove_button_color)
 	# Update collection text
 	w["text_collection"].update(f"Collection: {collection}")
+	# Update collections dropdown
+	w["collections_dropdown"].update(values=list(collections.keys()))
+	w["collections_dropdown"].update(value=collection)
+	# Update portfolio text
+	w["portfolio_text"].update(f"Portfolio ({len(collections[collection].keys())})")
 	# Update graph
 	draw_graph()
 
 def get_coin_id(event):
 	return int(event[event.rindex("-")+1:])
+
+def browse_coin(coin_id):
+	slug = listings_data[coin_id]["slug"]
+	url = f"https://coinmarketcap.com/currencies/{slug}/"
+	os.startfile(url)
 
 def add_coin(coin_id, quantity=0):
 	db_create_portfolio_entry(coin_id, quantity)
@@ -668,7 +716,11 @@ def addremove_coin(coin_id):
 def is_in_collection(coin_id):
 	return collection in collections and coin_id in collections[collection]
 
-
+def switch_collection(collection_name):
+	global collection
+	collection = collection_name
+	generate_collections()
+	update_info()
 
 def main_loop():
 	global refresh_window
@@ -678,11 +730,22 @@ def main_loop():
 	i = 0
 	# Process window 'events'
 	while True:
+		if refresh_window:
+			break
 		event, values = w.Read(timeout=16, timeout_key="w_timeout")
 		
 		# Do stuff even if there is nothing to be read
 		lt = w.FindElement("listings_title")
-		lt.update(f"Time: {str(datetime.datetime.now()) } OK")
+		time_now = datetime.datetime.now().astimezone()
+		to_be_updated_at = last_update_at + datetime.timedelta(seconds=config.interval_coinmarketcap)
+		# + 5 to leave some headroom in case the data is not yet in db
+		time_till_next_update_s = (to_be_updated_at - time_now).total_seconds() + 5
+		if time_till_next_update_s <= 0 and w.ReturnValuesDictionary["auto_update"] == True:
+			# generate_live_listings()
+			# update_info()
+			refresh_window = True
+			continue
+		lt.update(f"Time: {time_now.strftime('%d.%m.%Y %H:%M:%S')}\nNext update in: {time_till_next_update_s:.1f}s")
 		
 		# If the user closes the window - end it all
 		if event in (sg.WIN_CLOSED, 'Exit'):
@@ -728,6 +791,14 @@ def main_loop():
 		if "addremove_button_info" in event:
 			addremove_coin(selected_coin_id)
 
+		if "browse_coin-" in event:
+			browse_coin(get_coin_id(event))
+
+		if "collections_dropdown" in event:
+			dropdown_val = w.ReturnValuesDictionary["collections_dropdown"]
+			if dropdown_val != collection:
+				switch_collection(dropdown_val)
+
 		if event == "sizemoved":
 			handle_window_sizemoved()
 
@@ -737,6 +808,12 @@ def main_loop():
 
 		if "update_holding" in event:
 			update_holding()
+
+		if "update_listings" in event:
+			# generate_live_listings()
+			# update_info()
+			refresh_window = True
+			continue
 
 		# Graphing
 		if event is 'Plot':
