@@ -37,7 +37,7 @@ col_bg_2 = "#ebf0fa"
 col_viewing_color = "#FFE4E1"
 col_listings_color_back = "#EBEEF3"
 color_accent_main = "#5079D3"
-color_selected = "Slategray1"
+color_selected = color_accent_main #"Slategray1"
 color_deselected = col_listings_color
 color_change_positive = "#4bd37b"
 color_change_negative = "#d3574b"
@@ -59,7 +59,8 @@ timeseries = None
 selected_coin_listing = {}
 selected_coin_id = 1 # 1 = bitcoin ; 1027 = ethereum
 coins_viewable = 20 # 20
-listings_history = 4000 # 300
+listings_history = 40 # 300
+generated_listings_all = [] # All of the coins added in graphics
 
 # DB
 # Default user ensures out of the box functionality but should not be used if you plan on storing portfolio data
@@ -158,13 +159,15 @@ log.info("Logged in default user")
 # portfolio_entries4 = db_get_portfolio_entries()
 # print("Tested portfolios")
 
-# Get portfolio entries
+# 
+# Get portfolio entries / Generate collections and their coins and holdings quantities
 def generate_collections():
 	db_create_table_portfolios()
 	global collection
 	global collections
 	collections = {}
 	db_portfolio_entries = db_get_portfolio_entries()
+	log.info("Got collections from portfolios")
 	# Ensure there is always at least the default collection (even if it has 0 value)
 	if len(db_portfolio_entries) == 0:
 		db_create_portfolio_entry(1, 0)
@@ -181,6 +184,15 @@ def generate_collections():
 			collection = collection_default_name
 	return collections
 
+def get_collection_value(collection):
+	total_amount = 0
+	coin_ids = collections[collection]
+	for coin_id, amount in coin_ids.items():
+		coin_listing = listings_data[coin_id]
+		coin_price = coin_listing["quote"]["EUR"]["price"]
+		total_amount += coin_price * float(amount)
+	return total_amount
+
 def update_holding():
 	input_text = w.ReturnValuesDictionary["input_holding"]
 	# Check if user input a number and update the db portfolios record else just reset to default input value
@@ -191,6 +203,7 @@ def update_holding():
 		db.update_at(config.tablename_portfolios, "quantity=%s WHERE user_id=%s AND coin_id=%s AND collection=%s", [input_val, user["id"], selected_coin_id, collection])
 		generate_collections()
 		update_info()
+		update_plusminus_coin_button(selected_coin_id)
 	except Exception as e:
 		w["input_holding"].update(w["input_holding"].DefaultText)
 
@@ -199,9 +212,14 @@ def remove_holding(coin_id):
 	generate_collections()
 	update_info()
 
-# Generate collections and their coins and holdings quantities
-collections = generate_collections()
-log.info("Got collections from portfolios")
+def delete_portfolio_collection():
+	db.delete_from(config.tablename_portfolios, "user_id=%s AND collection=%s", [user["id"], collection])
+	generate_collections()
+	update_info()
+
+# # Generate collections and their coins and holdings quantities
+# collections = generate_collections()
+# log.info("Got collections from portfolios")
 
 # VERY suboptimal but works for now
 def generate_timeseries():
@@ -389,7 +407,7 @@ def generate_live_listings():
 # Build main layout when the main window is being created
 # This can be either be called at program start or when redrawing new layout
 def build_main_layout():
-	global font
+	# global font
 	generate_live_listings()
 	win_w = w_size[0] #px_to_char_w(w_size[0])
 	win_h = w_size[1] #px_to_char_h(w_size[1])
@@ -399,9 +417,12 @@ def build_main_layout():
 	col_listings_h = win_h - menubar_h
 	tracked_listings_table = []
 	all_listings_table = []
+	global generated_listings_all
+	generated_listings_all = []
 	i = 0
 	padd = 5
 	for listing in listings:
+		generated_listings_all.append(listing)
 		in_collection = is_in_collection(listing["id"])
 		img_path = get_image_path(listing["id"])
 		ltext = f"{listing['name']}\n{listing['quote']['EUR']['price']:.2f} €"
@@ -456,11 +477,21 @@ def build_main_layout():
 			[
 				sg.Text('Live listings', background_color=col_listings_color, key="listings_title", size=(28,2), pad=(padd, padd)), 
 				sg.Check("Auto update", default=can_auto_update, key="auto_update", background_color=col_listings_color, pad=(padd, padd)),
-				sg.Button("Update", key="update_listings", pad=(padd, padd))
+				sg.Button("Update", key="update_listings", pad=(padd, padd), button_color=(col_listings_color, color_accent_main))
 			],
 			[
-				sg.Combo(values=["ena", "dve"], size=(30,3), pad=(padd, padd), auto_size_text=False, background_color=col_listings_color, text_color=color_accent_main, readonly=True, change_submits=True, enable_events=True, key="collections_dropdown")
-			],
+				sg.Column(
+					[
+						[
+							sg.Combo(values=["ena", "dve"], size=(36,3), pad=(padd, padd), auto_size_text=False, background_color=col_listings_color, text_color=color_accent_main, readonly=True, change_submits=True, enable_events=True, key="collections_dropdown"),
+							sg.Button("➕", size=(5, 1), pad=(padd * 1, padd), button_color=(col_listings_color, color_accent_main), key="add_collection"),
+							sg.Button("  🗑️", size=(5, 1), pad=(padd * 1, padd), button_color=(col_listings_color, color_change_negative), key="remove_collection")
+						],
+						[
+							sg.Text(f"Collection value: {get_collection_value(collection):.2f}€", pad=(padd, None), background_color=col_listings_color, size=(30, 1), key="collection_value", font=(font_family, 16))
+						]
+					], pad=(0, padd * 2), justification="c", background_color=col_listings_color)
+			]
 		]
 
 	listings_topbar = sg.Column(listings_topbar_layout, pad=(0, 0), element_justification='center', key="listings_topbar", size=(col_listings_w, 150), background_color=col_listings_color, justification="center")
@@ -642,11 +673,11 @@ def update_info(coin_id=None):
 	# if coin_id == None:
 	
 	# Deselect previously selected
-	w[f"crypto_text-{selected_coin_id}"].update(background_color=color_deselected)
+	w[f"crypto_text-{selected_coin_id}"].update(background_color=color_deselected, text_color="black")
 	if coin_id != None:
 		selected_coin_id = coin_id
 	# Select current
-	w[f"crypto_text-{selected_coin_id}"].update(background_color=color_selected)
+	w[f"crypto_text-{selected_coin_id}"].update(background_color=color_selected, text_color=col_listings_color)
 	selected_coin_listing = listings_data[selected_coin_id]
 	# Update info
 	holding_val = 0
@@ -678,6 +709,8 @@ def update_info(coin_id=None):
 	w["collections_dropdown"].update(value=collection)
 	# Update portfolio text
 	w["portfolio_text"].update(f"Portfolio ({len(collections[collection].keys())})")
+	# Update collection value
+	w["collection_value"].update(f"Collection value: {get_collection_value(collection):.2f}€")
 	# Update graph
 	draw_graph()
 
@@ -700,11 +733,7 @@ def remove_coin(coin_id):
 	generate_collections()
 	update_info()
 
-def addremove_coin(coin_id):
-	if is_in_collection(coin_id):
-		remove_coin(coin_id)
-	else:
-		add_coin(coin_id)
+def update_plusminus_coin_button(coin_id = selected_coin_id):
 	# Then check again and update the + - button
 	if is_in_collection(coin_id):
 		w[f"add_button-{coin_id}"].update(text="➖")
@@ -713,12 +742,32 @@ def addremove_coin(coin_id):
 		w[f"add_button-{coin_id}"].update(text="➕")
 		w[f"add_button-{coin_id}"].update(button_color=color_change_positive)
 
+def addremove_coin(coin_id):
+	if is_in_collection(coin_id):
+		remove_coin(coin_id)
+	else:
+		add_coin(coin_id)
+	update_plusminus_coin_button(coin_id)
+
 def is_in_collection(coin_id):
 	return collection in collections and coin_id in collections[collection]
 
 def switch_collection(collection_name):
 	global collection
 	collection = collection_name
+	# Update add/remove buttons
+	for listing in generated_listings_all:
+		coin_id = listing["id"]
+		# Update buttons
+		add_button_text = ""
+		add_button_color = ()
+		if is_in_collection(coin_id):
+			add_button_text = "➖"
+			add_button_color = color_change_negative
+		else:
+			add_button_text = "➕"
+			add_button_color = color_change_positive
+		w[f"add_button-{coin_id}"].update(add_button_text, button_color=add_button_color)
 	generate_collections()
 	update_info()
 
@@ -730,6 +779,8 @@ def main_loop():
 	i = 0
 	# Process window 'events'
 	while True:
+		global collection
+
 		if refresh_window:
 			break
 		event, values = w.Read(timeout=16, timeout_key="w_timeout")
@@ -814,6 +865,18 @@ def main_loop():
 			# update_info()
 			refresh_window = True
 			continue
+
+		if "add_collection" in event:
+			# TODO add window with input box and a way to update and add new collections by specific text inputs
+			collection = str(datetime.datetime.now())
+			# By default add 0 bitcoin (1, 0)
+			add_coin(1, 0) # better than db_create_portfolio_entry
+			switch_collection(collection)
+
+		if "remove_collection" in event:
+			# TODO add a popup for safety to confirm deletion
+			delete_portfolio_collection()
+			switch_collection(collection)
 
 		# Graphing
 		if event is 'Plot':
