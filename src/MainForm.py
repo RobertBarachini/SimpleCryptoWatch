@@ -131,9 +131,10 @@ def login_user(username, password):
 	db_create_table_users()
 	global user
 	userlogin = db_login_user(username, password)
-	if userlogin == -2:
-		db_create_user(username, password)
-		userlogin = db_login_user(username, password)
+	# Create user if it doesn't already exist - removed because it should be created only if we select Sign up
+	# if userlogin == -2:
+		# db_create_user(username, password)
+		# userlogin = db_login_user(username, password)
 	user = userlogin
 	return user
 	
@@ -570,8 +571,28 @@ def build_main_layout():
 		],
 		[
 			sg.Text("Collection: ", size=(30, 1), pad=(padd, padd), background_color=col_listings_color, key="text_collection")
-			
 		]
+		# [
+		# 	sg.Text(f"Name:", key="details_name"),
+		# 	sg.Text(f"Symbol:", key="details_symb"),
+		# 	sg.Text(f"Slug:", key="details_slug")
+		# ],
+		# [
+		# 	sg.Column([
+		# 			[sg.Text(f"Price:", key="details_price")],
+		# 			[sg.Text(f"Volume 24h:", key="details_volume24h")],
+		# 			[sg.Text(f"% delta 1h:", key="details_delta1h")]
+		# 			[sg.Text(f"% delta 24h:", key="details_delta24h")],
+		# 			[sg.Text(f"% delta :", key="details_delta")]
+		# 		], background_color=col_listings_color, pad=(padd, padd)),
+		# 	sg.Column([
+		# 			[sg.Text("Collection: ", size=(30, 1), pad=(padd, padd), background_color=col_listings_color, key="text_collection")],
+		# 			[sg.Text(f"Max supply:", key="max_supply",pad=(padd, padd), background_color=col_listings_color)],
+		# 			[sg.Text(f"Circulating supply:", key="circulating_supply", background_color=col_listings_color)],
+		# 			[sg.Text(f"Total supply:", key="total_supply", background_color=col_listings_color)],
+		# 			[sg.Text(f"Platform:", key="platform", background_color=col_listings_color)]
+		# 		], background_color=col_listings_color, pad=(padd, padd))
+		# ]
 	]
 
 	col_viewing_layout = [
@@ -959,7 +980,8 @@ def main_loop():
 					password = w_collection.ReturnValuesDictionary["password_input"]
 					if len(username) != 0 and len(password) != 0:
 						user = login_user(username, password)
-						if user != -1 and user != -2:
+						if user != None and user != -1 and user != -2:
+							collection = collection_default_name
 							generate_collections()
 							update_info()
 							switch_collection(collection)
@@ -972,11 +994,11 @@ def main_loop():
 					if len(username) != 0 and len(password) != 0:
 						db_create_user(username, password)
 						user = login_user(username, password)
-						if user != -1 and user != -2:
+						if user != None and user != -1 and user != -2:
+							collection = collection_default_name
 							generate_collections()
 							update_info()
 							switch_collection(collection)
-
 					break
 
 				if "Cancel" in w_collection_event:
