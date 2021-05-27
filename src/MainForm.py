@@ -30,6 +30,7 @@ log = sf.set_logging("MainForm")
 # recreating the window from scratch ...
 w = None
 refresh_window = True
+popup_active = False
 w_size = (1680, 980)
 w_pos = (150, 40)
 col_listings_color = "#F9FBFD"
@@ -59,7 +60,7 @@ timeseries = None
 selected_coin_listing = {}
 selected_coin_id = 1 # 1 = bitcoin ; 1027 = ethereum
 coins_viewable = 20 # 20
-listings_history = 40 # 300
+listings_history = 400 # 300
 generated_listings_all = [] # All of the coins added in graphics
 
 # DB
@@ -569,6 +570,7 @@ def build_main_layout():
 		],
 		[
 			sg.Text("Collection: ", size=(30, 1), pad=(padd, padd), background_color=col_listings_color, key="text_collection")
+			
 		]
 	]
 
@@ -625,7 +627,8 @@ def init_window(name="SimpleCryptoWatch"):
 	w = sg.Window(name, 
 		main_layout, 
 		return_keyboard_events=True, 
-		finalize=True, font=font, 
+		finalize=True, 
+		font=font, 
 		resizable=True, 
 		element_padding=(0, 0), 
 		margins=(0, 0), 
@@ -711,6 +714,8 @@ def update_info(coin_id=None):
 	w["portfolio_text"].update(f"Portfolio ({len(collections[collection].keys())})")
 	# Update collection value
 	w["collection_value"].update(f"Collection value: {get_collection_value(collection):.2f}€")
+	# Update username
+	w["username"].update(f"👤: {user['username']}")
 	# Update graph
 	draw_graph()
 
@@ -780,6 +785,8 @@ def main_loop():
 	# Process window 'events'
 	while True:
 		global collection
+		global popup_active
+		global user
 
 		if refresh_window:
 			break
@@ -801,6 +808,10 @@ def main_loop():
 		# If the user closes the window - end it all
 		if event in (sg.WIN_CLOSED, 'Exit'):
 			break
+
+		# Check if a user input window or a popup is active - block all other functions of the primary window
+		if popup_active:
+			continue
 
 		# Check if you even have an event
 		if not event:
@@ -866,12 +877,118 @@ def main_loop():
 			refresh_window = True
 			continue
 
-		if "add_collection" in event:
+
+
+		# Add collection - new blocking popup window
+		if "add_collection" in event and popup_active == False:
 			# TODO add window with input box and a way to update and add new collections by specific text inputs
-			collection = str(datetime.datetime.now())
-			# By default add 0 bitcoin (1, 0)
-			add_coin(1, 0) # better than db_create_portfolio_entry
-			switch_collection(collection)
+			popup_active = True
+			layout_w = [
+				[sg.Text("New collection name:", background_color=col_listings_color), sg.Input(default_text="", size=(30,1), key="collection_name_input", text_color=col_listings_color)],
+				[sg.Button("Create"), sg.Button("Cancel")]
+			]
+			# w_collection = sg.Window("Add new collection", layout_w, finalize=True, font=font)
+			w_collection = sg.Window("Add new collection", 
+				layout_w, 
+				return_keyboard_events=True, 
+				finalize=True, 
+				font=font, 
+				resizable=True, 
+				element_padding=(5, 5), 
+				margins=(5, 5), 
+				background_color=col_listings_color, 
+				element_justification="c")
+			w_collection.BringToFront()
+			while True:
+				w_collection_event, w_collection_values = w_collection.Read()
+				print("w_collection: ", w_collection_event, w_collection_values)
+				if w_collection_event in (sg.WIN_CLOSED, 'Exit'):
+					break
+
+				if "Create" in w_collection_event:
+					new_name = w_collection.ReturnValuesDictionary["collection_name_input"]
+					if len(new_name) == 0:
+						new_name = str(datetime.datetime.now())
+					# By default add 0 bitcoin (1, 0)
+					collection = new_name
+					add_coin(1, 0) # better than db_create_portfolio_entry
+					switch_collection(collection)
+					break
+
+				if "Cancel" in w_collection_event:
+					break
+			w_collection.close()
+			# Release the block on the main window
+			popup_active = False
+
+
+
+
+
+
+		# Login
+		if "login" in event and popup_active == False:
+			# TODO add window with input box and a way to update and add new collections by specific text inputs
+			popup_active = True
+			layout_w = [
+				[sg.Text("Username:", background_color=col_listings_color), sg.Input(default_text="", size=(30,1), key="username_input", text_color=col_listings_color)],
+				[sg.Text("Password:", background_color=col_listings_color), sg.Input(default_text="", size=(30,1), key="password_input", text_color=col_listings_color, password_char="*")],
+				[sg.Button("Login"), sg.Button("Cancel")],
+				[sg.Button("Sign up")]
+			]
+			# w_collection = sg.Window("Add new collection", layout_w, finalize=True, font=font)
+			w_collection = sg.Window("Add new collection", 
+				layout_w, 
+				return_keyboard_events=True, 
+				finalize=True, 
+				font=font, 
+				resizable=True, 
+				element_padding=(5, 5), 
+				margins=(5, 5), 
+				background_color=col_listings_color, 
+				element_justification="c")
+			w_collection.BringToFront()
+			while True:
+				w_collection_event, w_collection_values = w_collection.Read()
+				print("w_collection: ", w_collection_event, w_collection_values)
+				if w_collection_event in (sg.WIN_CLOSED, 'Exit'):
+					break
+
+				if "Login" in w_collection_event:
+					username = w_collection.ReturnValuesDictionary["username_input"]
+					password = w_collection.ReturnValuesDictionary["password_input"]
+					if len(username) != 0 and len(password) != 0:
+						user = login_user(username, password)
+						if user != -1 and user != -2:
+							generate_collections()
+							update_info()
+							switch_collection(collection)
+					break
+				
+
+				if "Sign up" in w_collection_event:
+					username = w_collection.ReturnValuesDictionary["username_input"]
+					password = w_collection.ReturnValuesDictionary["password_input"]
+					if len(username) != 0 and len(password) != 0:
+						db_create_user(username, password)
+						user = login_user(username, password)
+						if user != -1 and user != -2:
+							generate_collections()
+							update_info()
+							switch_collection(collection)
+
+					break
+
+				if "Cancel" in w_collection_event:
+					break
+			w_collection.close()
+			# Release the block on the main window
+			popup_active = False
+
+
+
+
+
 
 		if "remove_collection" in event:
 			# TODO add a popup for safety to confirm deletion
