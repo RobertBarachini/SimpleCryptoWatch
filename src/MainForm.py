@@ -31,7 +31,7 @@ log = sf.set_logging("MainForm")
 w = None
 refresh_window = True
 popup_active = False
-w_size = (1680, 980)
+w_size = (1700, 1000)
 w_pos = (150, 40)
 col_listings_color = "#F9FBFD"
 col_bg_2 = "#ebf0fa"
@@ -373,6 +373,8 @@ def get_image_path(id):
 
 def get_change_color(change_val):
 	color = "black"
+	if change_val == None:
+		return color
 	if change_val > 0:
 		color = color_change_positive
 	if change_val < 0:
@@ -519,7 +521,7 @@ def build_main_layout():
 
 	col_viewing_w = win_w - col_listings_w
 	col_viewing_h = col_listings_h
-	details_h = 300
+	details_h = 340
 
 	controls_h = 50
 	global graph_w
@@ -563,36 +565,47 @@ def build_main_layout():
 
 	details_layout = [
 		[
+			sg.Text(f"Name:", key="details_name", pad=(padd, padd), background_color=col_listings_color, size=(20,None)),
+			sg.Text(f"Symbol:", key="details_symbol", pad=(padd, padd), background_color=col_listings_color, size=(20,None)),
+			sg.Text(f"Slug:", key="details_slug", pad=(padd, padd), background_color=col_listings_color, size=(20,None)),
+			sg.Text(f"Price:", key="details_price", pad=(padd, padd), background_color=col_listings_color, size=(20,None))
+		],
+		[
 			sg.Text("Holding quantity:", pad=(padd, padd), background_color=col_listings_color),
 			sg.Input(default_text="0", size=(10, 1), justification="l", pad=(padd, padd), background_color=col_listings_color, text_color=color_accent_main, key="input_holding"),
 			sg.Text(f"Value: 0 €", pad=(padd, padd), background_color=col_listings_color, key="holding_value", size=(30, 1)),
 			sg.Button("Update", size=(8, 1), pad=(padd * 2, padd), button_color=(col_listings_color, color_accent_main), key="update_holding"),
 			sg.Button("Add", size=(8, 1), pad=(padd * 2, padd), button_color=(col_listings_color, color_accent_main), key="addremove_button_info")
 		],
-		[
-			sg.Text("Collection: ", size=(30, 1), pad=(padd, padd), background_color=col_listings_color, key="text_collection")
-		]
 		# [
-		# 	sg.Text(f"Name:", key="details_name"),
-		# 	sg.Text(f"Symbol:", key="details_symb"),
-		# 	sg.Text(f"Slug:", key="details_slug")
+		# 	sg.Text("Collection: ", size=(30, 1), pad=(padd, padd), background_color=col_listings_color, key="text_collection")
 		# ],
-		# [
-		# 	sg.Column([
-		# 			[sg.Text(f"Price:", key="details_price")],
-		# 			[sg.Text(f"Volume 24h:", key="details_volume24h")],
-		# 			[sg.Text(f"% delta 1h:", key="details_delta1h")]
-		# 			[sg.Text(f"% delta 24h:", key="details_delta24h")],
-		# 			[sg.Text(f"% delta :", key="details_delta")]
-		# 		], background_color=col_listings_color, pad=(padd, padd)),
-		# 	sg.Column([
-		# 			[sg.Text("Collection: ", size=(30, 1), pad=(padd, padd), background_color=col_listings_color, key="text_collection")],
-		# 			[sg.Text(f"Max supply:", key="max_supply",pad=(padd, padd), background_color=col_listings_color)],
-		# 			[sg.Text(f"Circulating supply:", key="circulating_supply", background_color=col_listings_color)],
-		# 			[sg.Text(f"Total supply:", key="total_supply", background_color=col_listings_color)],
-		# 			[sg.Text(f"Platform:", key="platform", background_color=col_listings_color)]
-		# 		], background_color=col_listings_color, pad=(padd, padd))
-		# ]
+		[
+			sg.Column([
+					[sg.Text(f"Volume 24h:         ", key="details_volume24h", pad=(padd, padd), background_color=col_listings_color, size=(56, 1))],
+					[sg.Text(f"Market cap:         ", key="details_marketcap", pad=(padd, padd), background_color=col_listings_color, size=(56, 1))],
+					[sg.Text(f"Max supply:         ", key="details_max_supply", pad=(padd, padd), background_color=col_listings_color, size=(56, 1))],
+					[sg.Text(f"Circulating supply: ", key="details_circulating_supply", pad=(padd, padd), background_color=col_listings_color, size=(56, 1))],
+					[sg.Text(f"Total supply:       ", key="details_total_supply", pad=(padd, padd), background_color=col_listings_color, size=(56, 1))],
+					[sg.Text(f"Platform:           ", key="details_platform", pad=(padd, padd), background_color=col_listings_color, size=(56, 1))]
+				], background_color=col_listings_color, pad=(0, padd)),
+			sg.Column([
+					[sg.Text(f" 1h:", key="details_delta1h", pad=(padd, padd), background_color=col_listings_color, size=(7, None), justification="r")],
+					[sg.Text(f"24h:", key="details_delta24h", pad=(padd, padd), background_color=col_listings_color, size=(7, None), justification="r")],
+					[sg.Text(f"7d:", key="details_delta7d", pad=(padd, padd), background_color=col_listings_color, size=(7, None), justification="r")],
+					[sg.Text(f"30d:", key="details_delta30d", pad=(padd, padd), background_color=col_listings_color, size=(7, None), justification="r")],
+					[sg.Text(f"60d:", key="details_delta60d", pad=(padd, padd), background_color=col_listings_color, size=(7, None), justification="r")],
+					[sg.Text(f"90d:", key="details_delta90d", pad=(padd, padd), background_color=col_listings_color, size=(7, None), justification="r")]
+				], background_color=col_listings_color, pad=(padd, padd)),
+			sg.Column([
+					[sg.Text(f"42.42%", key="details_delta1h_v", pad=(padd, padd), background_color=col_listings_color, size=(8, None), justification="r")],
+					[sg.Text(f"42.42%", key="details_delta24h_v", pad=(padd, padd), background_color=col_listings_color, size=(8, None), justification="r")],
+					[sg.Text(f"42.42%", key="details_delta7d_v", pad=(padd, padd), background_color=col_listings_color, size=(8, None), justification="r")],
+					[sg.Text(f"42.42%", key="details_delta30d_v", pad=(padd, padd), background_color=col_listings_color, size=(8, None), justification="r")],
+					[sg.Text(f"42.42%", key="details_delta60d_v", pad=(padd, padd), background_color=col_listings_color, size=(8, None), justification="r")],
+					[sg.Text(f"42.42%", key="details_delta90d_v", pad=(padd, padd), background_color=col_listings_color, size=(8, None), justification="r")]
+				], background_color=col_listings_color, pad=(padd, padd))
+		]
 	]
 
 	col_viewing_layout = [
@@ -726,8 +739,8 @@ def update_info(coin_id=None):
 		addremove_button_color = color_change_positive
 	addremove_button.update(text=addremove_button_text)
 	addremove_button.update(button_color=addremove_button_color)
-	# Update collection text
-	w["text_collection"].update(f"Collection: {collection}")
+	# # Update collection text
+	# w["text_collection"].update(f"Collection: {collection}")
 	# Update collections dropdown
 	w["collections_dropdown"].update(values=list(collections.keys()))
 	w["collections_dropdown"].update(value=collection)
@@ -737,6 +750,60 @@ def update_info(coin_id=None):
 	w["collection_value"].update(f"Collection value: {get_collection_value(collection):.2f}€")
 	# Update username
 	w["username"].update(f"👤: {user['username']}")
+
+	#
+	# UPDATE DETAILS
+	#
+	w["details_name"].update(f"Name: {selected_coin_listing['name']}")
+	w["details_symbol"].update(f"Symbol: {selected_coin_listing['symbol']}")
+	w["details_slug"].update(f"Slug: {selected_coin_listing['slug']}")
+	w["details_price"].update(f"Price: {selected_coin_listing['quote']['EUR']['price']:.2f}€")
+
+	vv = selected_coin_listing['quote']['EUR']['percent_change_1h']
+	if vv != None:
+		vvs = f"{vv:.2f}%"
+	else:
+		vvs = "None"
+	w["details_delta1h_v"].update(vvs, text_color=get_change_color(vv))
+	vv = selected_coin_listing['quote']['EUR']['percent_change_24h']
+	if vv != None:
+		vvs = f"{vv:.2f}%"
+	else:
+		vvs = "None"
+	w["details_delta24h_v"].update(vvs, text_color=get_change_color(vv))
+	vv = selected_coin_listing['quote']['EUR']['percent_change_7d']
+	if vv != None:
+		vvs = f"{vv:.2f}%"
+	else:
+		vvs = "None"
+	w["details_delta7d_v"].update(vvs, text_color=get_change_color(vv))
+	vv = selected_coin_listing['quote']['EUR']['percent_change_30d']
+	if vv != None:
+		vvs = f"{vv:.2f}%"
+	else:
+		vvs = "None"
+	w["details_delta30d_v"].update(vvs, text_color=get_change_color(vv))
+	vv = selected_coin_listing['quote']['EUR']['percent_change_60d']
+	if vv != None:
+		vvs = f"{vv:.2f}%"
+	w["details_delta60d_v"].update(vvs, text_color=get_change_color(vv))
+	vv = selected_coin_listing['quote']['EUR']['percent_change_90d']
+	if vv != None:
+		vvs = f"{vv:.2f}%"
+	else:
+		vvs = "None"
+	w["details_delta90d_v"].update(vvs, text_color=get_change_color(vv))
+
+	w["details_volume24h"].update(f"Volume 24h:         {selected_coin_listing['quote']['EUR']['volume_24h']}€")
+	w["details_marketcap"].update(f"Market cap:         {selected_coin_listing['quote']['EUR']['market_cap']}€")
+	w["details_max_supply"].update(f"Max supply:         {selected_coin_listing['max_supply']}")
+	w["details_circulating_supply"].update(f"Circulating supply: {selected_coin_listing['circulating_supply']}")
+	w["details_total_supply"].update(f"Total supply:       {selected_coin_listing['total_supply']}")
+	vv_platform = selected_coin_listing['platform']
+	if vv_platform != None:
+		vv_platform = selected_coin_listing['platform']['name']
+	w["details_platform"].update(f"Platform:           {vv_platform}")
+
 	# Update graph
 	draw_graph()
 
@@ -849,7 +916,7 @@ def main_loop():
 		# From here on out update window stuff
 
 		# Print values - for debug
-		print(event, values)
+		# print(event, values)
 
 		if "add_text" in event:
 			w.extend_layout(w["topbar_texts"], [[sg.Text("yoooo")]])
@@ -922,7 +989,7 @@ def main_loop():
 			w_collection.BringToFront()
 			while True:
 				w_collection_event, w_collection_values = w_collection.Read()
-				print("w_collection: ", w_collection_event, w_collection_values)
+				# print("w_collection: ", w_collection_event, w_collection_values)
 				if w_collection_event in (sg.WIN_CLOSED, 'Exit'):
 					break
 
@@ -971,7 +1038,7 @@ def main_loop():
 			w_collection.BringToFront()
 			while True:
 				w_collection_event, w_collection_values = w_collection.Read()
-				print("w_collection: ", w_collection_event, w_collection_values)
+				# print("w_collection: ", w_collection_event, w_collection_values)
 				if w_collection_event in (sg.WIN_CLOSED, 'Exit'):
 					break
 
