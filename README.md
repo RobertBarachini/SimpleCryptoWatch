@@ -2,6 +2,8 @@
 
 🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀
 
+![SimpleCryptoWatch logo](res/prog/logo.png)
+
 # Setup
 
 ## 0. Install PostgreSQL (and pgAdmin)
