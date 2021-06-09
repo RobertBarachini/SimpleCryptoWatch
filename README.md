@@ -53,29 +53,29 @@ Note that if you plan to run the Windows service that fetches the data, you may 
 Start PowerShell with admin privileges and navigate to project root
 > cd src
 
-> python PythonService.py --startup auto install 
+> python ServiceSimpleCryptoWatch.py --startup auto install 
 
 You can also change the startup type in `Windows Services`. Example: Find the service by the name of `SimpleCryptoWatch` and change the `Startup Type` to `Automatic`.
 
 Useful commands:
 ```
 # Installing the service
-python PythonService.py install
+python ServiceSimpleCryptoWatch.py install
 
 # Let the service start automatically 
-python PythonService.py --startup auto install 
+python ServiceSimpleCryptoWatch.py --startup auto install 
  
 # Starting the service
-python PythonService.py start
+python ServiceSimpleCryptoWatch.py start
 
 # Restarting the service
-python PythonService.py restart
+python ServiceSimpleCryptoWatch.py restart
  
 # Stopping the service
-python PythonService.py stop
+python ServiceSimpleCryptoWatch.py stop
  
 # Removing the service
-python PythonService.py remove
+python ServiceSimpleCryptoWatch.py remove
  ```
 
 ## 5. Start the GUI by calling MainForm.py
