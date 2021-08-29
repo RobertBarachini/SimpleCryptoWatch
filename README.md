@@ -2,7 +2,8 @@
 
 🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀
 
-![SimpleCryptoWatch logo](res/prog/logo.png)
+![SimpleCryptoWatch GUI](res/prog/SimpleCryptoWatch.png "SimpleCryptoWatch GIO")
+![SimpleCryptoWatch logo](res/prog/logo.png "SimpleCryptoWatch logo")
 
 # Setup
 

@@ -60,7 +60,7 @@ timeseries = None
 selected_coin_listing = {}
 selected_coin_id = 1 # 1 = bitcoin ; 1027 = ethereum
 coins_viewable = 20 # 20
-listings_history = 400 # 300
+listings_history = 4000 # 300
 generated_listings_all = [] # All of the coins added in graphics
 
 # DB
